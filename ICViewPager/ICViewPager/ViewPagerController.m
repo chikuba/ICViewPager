@@ -14,6 +14,7 @@
 #define IOS_VERSION_7 [[[UIDevice currentDevice] systemVersion] compare:@"7.0" options:NSNumericSearch] != NSOrderedAscending
 
 #define kTabHeight 44.0
+#define kTabIndicatorHeight 2.5
 #define kTabOffset 56.0
 #define kTabWidth 128.0
 #define kTabLocation 1.0
@@ -62,6 +63,7 @@
 @interface TabView : UIView
 @property (nonatomic, getter = isSelected) BOOL selected;
 @property (nonatomic) UIColor *indicatorColor;
+@property (nonatomic) NSNumber *indicatorHeight;
 @end
 
 @implementation TabView
@@ -105,7 +107,7 @@
         // Draw the indicator
         [bezierPath moveToPoint:CGPointMake(0.0, CGRectGetHeight(rect) - 1.0)];
         [bezierPath addLineToPoint:CGPointMake(CGRectGetWidth(rect), CGRectGetHeight(rect) - 1.0)];
-        [bezierPath setLineWidth:5.0];
+        [bezierPath setLineWidth:self.indicatorHeight.floatValue * 2];
         [self.indicatorColor setStroke];
         [bezierPath stroke];
     }
@@ -128,6 +130,7 @@
 
 // Options
 @property (nonatomic) NSNumber *tabHeight;
+@property (nonatomic) NSNumber *tabIndicatorHeight;
 @property (nonatomic) NSNumber *tabOffset;
 @property (nonatomic) NSNumber *tabWidth;
 @property (nonatomic) NSNumber *tabLocation;
@@ -153,6 +156,7 @@
 @implementation ViewPagerController
 
 @synthesize tabHeight = _tabHeight;
+@synthesize tabIndicatorHeight = _tabIndicatorHeight;
 @synthesize tabOffset = _tabOffset;
 @synthesize tabWidth = _tabWidth;
 @synthesize tabLocation = _tabLocation;
@@ -259,6 +263,15 @@
         tabHeight = [NSNumber numberWithFloat:CGRectGetHeight(self.view.frame)];
     
     _tabHeight = tabHeight;
+}
+- (void)setIndicatorTabHeight:(NSNumber *)tabIndicatorHeight {
+    
+    if ([tabIndicatorHeight floatValue] < 0.0)
+        tabIndicatorHeight = [NSNumber numberWithFloat:5.0];
+    else if ([tabIndicatorHeight floatValue] > CGRectGetHeight(self.view.frame))
+        tabIndicatorHeight = [NSNumber numberWithFloat:CGRectGetHeight(self.view.frame)];
+    
+    _tabIndicatorHeight = tabIndicatorHeight;
 }
 - (void)setTabOffset:(NSNumber *)tabOffset {
     
@@ -445,6 +458,16 @@
     }
     return _tabHeight;
 }
+- (NSNumber *)tabIndicatorHeight {
+    
+    if (!_tabIndicatorHeight) {
+        CGFloat value = kTabIndicatorHeight;
+        if ([self.delegate respondsToSelector:@selector(viewPager:valueForOption:withDefault:)])
+            value = [self.delegate viewPager:self valueForOption:ViewPagerOptionTabIndicatorHeight withDefault:value];
+        self.tabIndicatorHeight = [NSNumber numberWithFloat:value];
+    }
+    return _tabIndicatorHeight;
+}
 - (NSNumber *)tabOffset {
     
     if (!_tabOffset) {
@@ -557,6 +580,7 @@
     // So that, ViewPager will reflect the changes
     // Empty all options
     _tabHeight = nil;
+    _tabIndicatorHeight = nil;
     _tabOffset = nil;
     _tabWidth = nil;
     _tabLocation = nil;
@@ -573,7 +597,6 @@
     // Call to setup again with the updated data
     [self defaultSetup];
 }
-
 - (void)selectTabAtIndex:(NSUInteger)index {
     [self selectTabAtIndex:index didSwipe:NO];
 }
@@ -586,7 +609,6 @@
     
     self.animatingToTab = YES;
     
-    // Keep a reference to previousIndex in case it is needed for the delegate
     NSUInteger previousIndex = self.activeTabIndex;
     
     // Set activeTabIndex
@@ -674,22 +696,27 @@
     
     // These colors will be updated
     UIColor *indicatorColor;
+    CGFloat indicatorHeight;
+    
     UIColor *tabsViewBackgroundColor;
     UIColor *contentViewBackgroundColor;
     
     // Get indicatorColor and check if it is different from the current one
     // If it is, update it
     indicatorColor = [self.delegate viewPager:self colorForComponent:ViewPagerIndicator withDefault:kIndicatorColor];
+    indicatorHeight = [self.delegate viewPager:self valueForOption:ViewPagerOptionTabIndicatorHeight withDefault:kTabIndicatorHeight];
     
     if (![self.indicatorColor isEqualToColor:indicatorColor]) {
         
         // We will iterate through all of the tabs to update its indicatorColor
         [self.tabs enumerateObjectsUsingBlock:^(TabView *tabView, NSUInteger index, BOOL *stop) {
             tabView.indicatorColor = indicatorColor;
+            tabView.indicatorHeight = [NSNumber numberWithFloat:indicatorHeight];
         }];
         
         // Update indicatorColor to check again later
         self.indicatorColor = indicatorColor;
+        self.tabIndicatorHeight = [NSNumber numberWithFloat:indicatorHeight];
     }
     
     // Get tabsViewBackgroundColor and check if it is different from the current one
@@ -725,6 +752,8 @@
     switch (option) {
         case ViewPagerOptionTabHeight:
             return [[self tabHeight] floatValue];
+        case ViewPagerOptionTabIndicatorHeight:
+            return [[self tabIndicatorHeight] floatValue];
         case ViewPagerOptionTabOffset:
             return [[self tabOffset] floatValue];
         case ViewPagerOptionTabWidth:
@@ -899,6 +928,7 @@
         [tabView addSubview:tabViewContent];
         [tabView setClipsToBounds:YES];
         [tabView setIndicatorColor:self.indicatorColor];
+        [tabView setIndicatorHeight:self.tabIndicatorHeight];
         
         tabViewContent.center = tabView.center;
         
